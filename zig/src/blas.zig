@@ -1,6 +1,8 @@
 const std = @import("std");
 const testing = std.testing;
 
+const Matrix = @import("./array.zig").Matrix;
+
 const Transpose = enum(u1) { N, T }; // (N, T): (Normal, Transpose)
 const WriteMode = enum(u1) { W, U }; // (W, U): (Overwrite, Update)
 
@@ -116,17 +118,14 @@ pub fn gemv(comptime T: type, comptime tA: Transpose, a: T, A: [][]T, x: []T, b:
 }
 
 test "blas.gemv.N" {
-    const allocator = testing.allocator;
-    const A: [][]f32 = blk: {
-        const mat: [][]f32 = try allocator.alloc([]f32, 4);
-        for (mat) |*row| row.* = try allocator.alloc(f32, 3);
-        break :blk mat;
-    };
+    const MatF32: Matrix(f32) = .{ .allocator = testing.allocator };
+    const A: [][]f32 = try MatF32.alloc(4, 3);
     inline for (.{ 4.0, 3.0, 1.0 }, A[0]) |v, *p| p.* = v;
     inline for (.{ 3.0, 7.0, 0.0 }, A[1]) |v, *p| p.* = v;
     inline for (.{ 2.0, 5.0, 3.0 }, A[2]) |v, *p| p.* = v;
     inline for (.{ 1.0, 1.0, 2.0 }, A[3]) |v, *p| p.* = v;
 
+    const allocator = testing.allocator;
     const x: []f32 = try allocator.alloc(f32, 3);
     inline for (.{ 3.0, 1.0, 5.0 }, x) |v, *p| p.* = v;
 
@@ -136,8 +135,7 @@ test "blas.gemv.N" {
     const z: []f32 = try allocator.alloc(f32, 4);
 
     defer {
-        for (A) |row| allocator.free(row);
-        allocator.free(A);
+        MatF32.free(A, 4, 3);
         allocator.free(x);
         allocator.free(y);
         allocator.free(z);
@@ -174,17 +172,14 @@ test "blas.gemv.N" {
 }
 
 test "blas.gemv.T" {
-    const allocator = testing.allocator;
-    const A: [][]f32 = blk: {
-        const mat: [][]f32 = try allocator.alloc([]f32, 4);
-        for (mat) |*row| row.* = try allocator.alloc(f32, 3);
-        break :blk mat;
-    };
+    const MatF32: Matrix(f32) = .{ .allocator = testing.allocator };
+    const A: [][]f32 = try MatF32.alloc(4, 3);
     inline for (.{ 7.0, -11.0, 0.0 }, A[0]) |v, *p| p.* = v;
     inline for (.{ 5.0, -17.0, 3.0 }, A[1]) |v, *p| p.* = v;
     inline for (.{ 1.0, -13.0, 2.0 }, A[2]) |v, *p| p.* = v;
     inline for (.{ 2.0, -19.0, 0.0 }, A[3]) |v, *p| p.* = v;
 
+    const allocator = testing.allocator;
     const x: []f32 = try allocator.alloc(f32, 4);
     inline for (.{ 3.0, 1.0, 0.0, 5.0 }, x) |v, *p| p.* = v;
 
@@ -194,8 +189,7 @@ test "blas.gemv.T" {
     const z: []f32 = try allocator.alloc(f32, 3);
 
     defer {
-        for (A) |row| allocator.free(row);
-        allocator.free(A);
+        MatF32.free(A, 4, 3);
         allocator.free(x);
         allocator.free(y);
         allocator.free(z);
@@ -295,13 +289,10 @@ pub fn geru(comptime T: type, mode: WriteMode, a: T, x: []T, y: []T, A: [][]T) v
 }
 
 test "blas.geru.W" {
-    const allocator = testing.allocator;
-    const A: [][]f32 = blk: {
-        const mat: [][]f32 = try allocator.alloc([]f32, 4);
-        for (mat) |*row| row.* = try allocator.alloc(f32, 3);
-        break :blk mat;
-    };
+    const MatF32: Matrix(f32) = .{ .allocator = testing.allocator };
+    const A: [][]f32 = try MatF32.alloc(4, 3);
 
+    const allocator = testing.allocator;
     const x: []f32 = try allocator.alloc(f32, 4);
     inline for (.{ -1.0, 3.0, -5.0, 1.0 }, x) |v, *p| p.* = v;
 
@@ -309,8 +300,7 @@ test "blas.geru.W" {
     inline for (.{ 3.0, 1.0, 5.0 }, y) |v, *p| p.* = v;
 
     defer {
-        for (A) |row| allocator.free(row);
-        allocator.free(A);
+        MatF32.free(A, 4, 3);
         allocator.free(x);
         allocator.free(y);
     }
@@ -333,13 +323,10 @@ test "blas.geru.W" {
 }
 
 test "blas.geru.U" {
-    const allocator = testing.allocator;
-    const A: [][]f32 = blk: {
-        const mat: [][]f32 = try allocator.alloc([]f32, 4);
-        for (mat) |*row| row.* = try allocator.alloc(f32, 3);
-        break :blk mat;
-    };
+    const MatF32: Matrix(f32) = .{ .allocator = testing.allocator };
+    const A: [][]f32 = try MatF32.alloc(4, 3);
 
+    const allocator = testing.allocator;
     const x: []f32 = try allocator.alloc(f32, 4);
     inline for (.{ -1.0, 3.0, -5.0, 1.0 }, x) |v, *p| p.* = v;
 
@@ -347,8 +334,7 @@ test "blas.geru.U" {
     inline for (.{ 3.0, 1.0, 5.0 }, y) |v, *p| p.* = v;
 
     defer {
-        for (A) |row| allocator.free(row);
-        allocator.free(A);
+        MatF32.free(A, 4, 3);
         allocator.free(x);
         allocator.free(y);
     }
