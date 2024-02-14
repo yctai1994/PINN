@@ -2,49 +2,48 @@ const std = @import("std");
 const testing = std.testing;
 
 const Matrix = @import("./array.zig").Matrix;
+const Vector = @import("./array.zig").Vector;
 
 const Transpose = enum(u1) { N, T }; // (N, T): (Normal, Transpose)
 const WriteMode = enum(u1) { W, U }; // (W, U): (Overwrite, Update)
 
-pub fn copy(comptime T: type, des: []T, src: []T) void {
-    if (@typeInfo(T) != .Float) @compileError("copy(T, ...): T should be a float type.");
+pub fn copy(des: []f64, src: []f64) void {
     for (des, src) |*pd, vs| pd.* = vs;
     return;
 }
 
 test "blas.copy" {
-    const allocator = testing.allocator;
-    const src: []f32 = try allocator.alloc(f32, 10);
-    const des: []f32 = try allocator.alloc(f32, 10);
+    const VecF64: Vector = .{ .allocator = testing.allocator };
+    const src: []f64 = try VecF64.alloc(10);
+    const des: []f64 = try VecF64.alloc(10);
 
     defer {
-        allocator.free(src);
-        allocator.free(des);
+        VecF64.free(src);
+        VecF64.free(des);
     }
 
     for (src, 0..) |*p, i| p.* = @floatFromInt(i);
 
-    copy(f32, des, src);
+    copy(des, src);
 
     for (des, src) |vd, vs| try testing.expectEqual(vd, vs);
 }
 
-pub fn xoty(comptime T: type, x: []T, y: []T, z: []T) void {
-    if (@typeInfo(T) != .Float) @compileError("xoty(T, ...): T should be a float type.");
+pub fn xoty(x: []f64, y: []f64, z: []f64) void {
     for (x, y, z) |vx, vy, *pz| pz.* = vx * vy;
     return;
 }
 
 test "blas.xoty" {
-    const allocator = testing.allocator;
-    const x: []f32 = try allocator.alloc(f32, 10);
-    const y: []f32 = try allocator.alloc(f32, 10);
-    const z: []f32 = try allocator.alloc(f32, 10);
+    const VecF64: Vector = .{ .allocator = testing.allocator };
+    const x: []f64 = try VecF64.alloc(10);
+    const y: []f64 = try VecF64.alloc(10);
+    const z: []f64 = try VecF64.alloc(10);
 
     defer {
-        allocator.free(x);
-        allocator.free(y);
-        allocator.free(z);
+        VecF64.free(x);
+        VecF64.free(y);
+        VecF64.free(z);
     }
 
     for (x, y, 0..) |*px, *py, i| {
@@ -52,14 +51,12 @@ test "blas.xoty" {
         py.* = @floatFromInt(3 * i);
     }
 
-    xoty(f32, x, y, z);
+    xoty(x, y, z);
 
-    for (z, 0..) |v, i| try testing.expectEqual(v, @as(f32, @floatFromInt(6 * i * i)));
+    for (z, 0..) |v, i| try testing.expectEqual(v, @as(f64, @floatFromInt(6 * i * i)));
 }
 
-pub fn gemv(comptime T: type, comptime tA: Transpose, a: T, A: [][]T, x: []T, b: T, y: []T, z: []T) void {
-    if (@typeInfo(T) != .Float) @compileError("gemv(T, ...): T should be a float type.");
-
+pub fn gemv(comptime tA: Transpose, a: f64, A: [][]f64, x: []f64, b: f64, y: []f64, z: []f64) void {
     if (b == 0.0) {
         for (z) |*pz| pz.* = 0.0;
     } else if (b == 1.0) {
@@ -74,7 +71,7 @@ pub fn gemv(comptime T: type, comptime tA: Transpose, a: T, A: [][]T, x: []T, b:
 
     switch (tA) {
         .N => {
-            var tmp: T = undefined;
+            var tmp: f64 = undefined;
             if (a == 1.0) {
                 for (A, z) |row, *pz| {
                     tmp = 0.0;
@@ -105,7 +102,7 @@ pub fn gemv(comptime T: type, comptime tA: Transpose, a: T, A: [][]T, x: []T, b:
                     for (row, z) |vr, *pz| pz.* -= vx * vr;
                 }
             } else {
-                var tmp: T = undefined;
+                var tmp: f64 = undefined;
                 for (A, x) |row, vx| {
                     tmp = a * vx;
                     for (row, z) |vr, *pz| pz.* += tmp * vr;
@@ -118,32 +115,32 @@ pub fn gemv(comptime T: type, comptime tA: Transpose, a: T, A: [][]T, x: []T, b:
 }
 
 test "blas.gemv.N" {
-    const MatF32: Matrix(f32) = .{ .allocator = testing.allocator };
-    const A: [][]f32 = try MatF32.alloc(4, 3);
+    const MatF64: Matrix = .{ .allocator = testing.allocator };
+    const A: [][]f64 = try MatF64.alloc(4, 3);
     inline for (.{ 4.0, 3.0, 1.0 }, A[0]) |v, *p| p.* = v;
     inline for (.{ 3.0, 7.0, 0.0 }, A[1]) |v, *p| p.* = v;
     inline for (.{ 2.0, 5.0, 3.0 }, A[2]) |v, *p| p.* = v;
     inline for (.{ 1.0, 1.0, 2.0 }, A[3]) |v, *p| p.* = v;
 
-    const allocator = testing.allocator;
-    const x: []f32 = try allocator.alloc(f32, 3);
+    const VecF64: Vector = .{ .allocator = testing.allocator };
+    const x: []f64 = try VecF64.alloc(3);
     inline for (.{ 3.0, 1.0, 5.0 }, x) |v, *p| p.* = v;
 
-    const y: []f32 = try allocator.alloc(f32, 4);
+    const y: []f64 = try VecF64.alloc(4);
     inline for (.{ -1.0, 3.0, -5.0, 1.0 }, y) |v, *p| p.* = v;
 
-    const z: []f32 = try allocator.alloc(f32, 4);
+    const z: []f64 = try VecF64.alloc(4);
 
     defer {
-        MatF32.free(A, 4, 3);
-        allocator.free(x);
-        allocator.free(y);
-        allocator.free(z);
+        MatF64.free(A, 4, 3);
+        VecF64.free(x);
+        VecF64.free(y);
+        VecF64.free(z);
     }
 
-    const a_list: [4]f32 = .{ 0.0, 1.0, -1.0, 3.0 };
-    const b_list: [4]f32 = .{ 0.0, 1.0, -1.0, -5.0 };
-    const z_list: [16][4]f32 = .{
+    const a_list: [4]f64 = .{ 0.0, 1.0, -1.0, 3.0 };
+    const b_list: [4]f64 = .{ 0.0, 1.0, -1.0, -5.0 };
+    const z_list: [16][4]f64 = .{
         .{ 0.0, 0.0, 0.0, 0.0 },
         .{ -1.0, 3.0, -5.0, 1.0 },
         .{ 1.0, -3.0, 5.0, -1.0 },
@@ -164,40 +161,40 @@ test "blas.gemv.N" {
 
     for (a_list, 0..) |a, ia| {
         for (b_list, 0..) |b, ib| {
-            gemv(f32, .N, a, A, x, b, y, z);
+            gemv(.N, a, A, x, b, y, z);
 
-            try testing.expect(std.mem.eql(f32, &z_list[4 * ia + ib], z));
+            try testing.expect(std.mem.eql(f64, &z_list[4 * ia + ib], z));
         }
     }
 }
 
 test "blas.gemv.T" {
-    const MatF32: Matrix(f32) = .{ .allocator = testing.allocator };
-    const A: [][]f32 = try MatF32.alloc(4, 3);
+    const MatF64: Matrix = .{ .allocator = testing.allocator };
+    const A: [][]f64 = try MatF64.alloc(4, 3);
     inline for (.{ 7.0, -11.0, 0.0 }, A[0]) |v, *p| p.* = v;
     inline for (.{ 5.0, -17.0, 3.0 }, A[1]) |v, *p| p.* = v;
     inline for (.{ 1.0, -13.0, 2.0 }, A[2]) |v, *p| p.* = v;
     inline for (.{ 2.0, -19.0, 0.0 }, A[3]) |v, *p| p.* = v;
 
-    const allocator = testing.allocator;
-    const x: []f32 = try allocator.alloc(f32, 4);
+    const VecF64: Vector = .{ .allocator = testing.allocator };
+    const x: []f64 = try VecF64.alloc(4);
     inline for (.{ 3.0, 1.0, 0.0, 5.0 }, x) |v, *p| p.* = v;
 
-    const y: []f32 = try allocator.alloc(f32, 3);
+    const y: []f64 = try VecF64.alloc(3);
     inline for (.{ -1.0, 2.0, 1.0 }, y) |v, *p| p.* = v;
 
-    const z: []f32 = try allocator.alloc(f32, 3);
+    const z: []f64 = try VecF64.alloc(3);
 
     defer {
-        MatF32.free(A, 4, 3);
-        allocator.free(x);
-        allocator.free(y);
-        allocator.free(z);
+        MatF64.free(A, 4, 3);
+        VecF64.free(x);
+        VecF64.free(y);
+        VecF64.free(z);
     }
 
-    const a_list: [4]f32 = .{ 0.0, 1.0, -1.0, 3.0 };
-    const b_list: [4]f32 = .{ 0.0, 1.0, -1.0, -5.0 };
-    const z_list: [16][3]f32 = .{
+    const a_list: [4]f64 = .{ 0.0, 1.0, -1.0, 3.0 };
+    const b_list: [4]f64 = .{ 0.0, 1.0, -1.0, -5.0 };
+    const z_list: [16][3]f64 = .{
         .{ 0.0, 0.0, 0.0 },
         .{ -1.0, 2.0, 1.0 },
         .{ 1.0, -2.0, -1.0 },
@@ -218,16 +215,14 @@ test "blas.gemv.T" {
 
     for (a_list, 0..) |a, ia| {
         for (b_list, 0..) |b, ib| {
-            gemv(f32, .T, a, A, x, b, y, z);
+            gemv(.T, a, A, x, b, y, z);
 
-            try testing.expect(std.mem.eql(f32, &z_list[4 * ia + ib], z));
+            try testing.expect(std.mem.eql(f64, &z_list[4 * ia + ib], z));
         }
     }
 }
 
-pub fn geru(comptime T: type, mode: WriteMode, a: T, x: []T, y: []T, A: [][]T) void {
-    if (@typeInfo(T) != .Float) @compileError("geru(T, ...): T should be a float type.");
-
+pub fn geru(comptime mode: WriteMode, a: f64, x: []f64, y: []f64, A: [][]f64) void {
     switch (mode) {
         .W => {
             if (a == 0.0) {
@@ -241,7 +236,7 @@ pub fn geru(comptime T: type, mode: WriteMode, a: T, x: []T, y: []T, A: [][]T) v
                     }
                 }
             } else if (a == -1.0) {
-                var tmp: T = undefined;
+                var tmp: f64 = undefined;
                 for (A, x) |row, vx| {
                     if (vx != 0.0) {
                         tmp = -vx;
@@ -249,7 +244,7 @@ pub fn geru(comptime T: type, mode: WriteMode, a: T, x: []T, y: []T, A: [][]T) v
                     }
                 }
             } else {
-                var tmp: T = undefined;
+                var tmp: f64 = undefined;
                 for (A, x) |row, vx| {
                     if (vx != 0.0) {
                         tmp = a * vx;
@@ -274,7 +269,7 @@ pub fn geru(comptime T: type, mode: WriteMode, a: T, x: []T, y: []T, A: [][]T) v
                     }
                 }
             } else {
-                var tmp: T = undefined;
+                var tmp: f64 = undefined;
                 for (A, x) |row, vx| {
                     if (vx != 0.0) {
                         tmp = a * vx;
@@ -289,24 +284,24 @@ pub fn geru(comptime T: type, mode: WriteMode, a: T, x: []T, y: []T, A: [][]T) v
 }
 
 test "blas.geru.W" {
-    const MatF32: Matrix(f32) = .{ .allocator = testing.allocator };
-    const A: [][]f32 = try MatF32.alloc(4, 3);
+    const MatF64: Matrix = .{ .allocator = testing.allocator };
+    const A: [][]f64 = try MatF64.alloc(4, 3);
 
-    const allocator = testing.allocator;
-    const x: []f32 = try allocator.alloc(f32, 4);
+    const VecF64: Vector = .{ .allocator = testing.allocator };
+    const x: []f64 = try VecF64.alloc(4);
     inline for (.{ -1.0, 3.0, -5.0, 1.0 }, x) |v, *p| p.* = v;
 
-    const y: []f32 = try allocator.alloc(f32, 3);
+    const y: []f64 = try VecF64.alloc(3);
     inline for (.{ 3.0, 1.0, 5.0 }, y) |v, *p| p.* = v;
 
     defer {
-        MatF32.free(A, 4, 3);
-        allocator.free(x);
-        allocator.free(y);
+        MatF64.free(A, 4, 3);
+        VecF64.free(x);
+        VecF64.free(y);
     }
 
-    const a_list: [4]f32 = .{ 0.0, 1.0, -1.0, 3.0 };
-    const A_list: [4][4][3]f32 = .{
+    const a_list: [4]f64 = .{ 0.0, 1.0, -1.0, 3.0 };
+    const A_list: [4][4][3]f64 = .{
         .{ .{ 0.0, 0.0, 0.0 }, .{ 0.0, 0.0, 0.0 }, .{ 0.0, 0.0, 0.0 }, .{ 0.0, 0.0, 0.0 } },
         .{ .{ -3.0, -1.0, -5.0 }, .{ 9.0, 3.0, 15.0 }, .{ -15.0, -5.0, -25.0 }, .{ 3.0, 1.0, 5.0 } },
         .{ .{ 3.0, 1.0, 5.0 }, .{ -9.0, -3.0, -15.0 }, .{ 15.0, 5.0, 25.0 }, .{ -3.0, -1.0, -5.0 } },
@@ -314,33 +309,33 @@ test "blas.geru.W" {
     };
 
     for (a_list, 0..) |a, ia| {
-        geru(f32, .W, a, x, y, A);
+        geru(.W, a, x, y, A);
 
         for (A_list[ia], A) |ans, row| {
-            try testing.expect(std.mem.eql(f32, &ans, row));
+            try testing.expect(std.mem.eql(f64, &ans, row));
         }
     }
 }
 
 test "blas.geru.U" {
-    const MatF32: Matrix(f32) = .{ .allocator = testing.allocator };
-    const A: [][]f32 = try MatF32.alloc(4, 3);
+    const MatF64: Matrix = .{ .allocator = testing.allocator };
+    const A: [][]f64 = try MatF64.alloc(4, 3);
 
-    const allocator = testing.allocator;
-    const x: []f32 = try allocator.alloc(f32, 4);
+    const VecF64: Vector = .{ .allocator = testing.allocator };
+    const x: []f64 = try VecF64.alloc(4);
     inline for (.{ -1.0, 3.0, -5.0, 1.0 }, x) |v, *p| p.* = v;
 
-    const y: []f32 = try allocator.alloc(f32, 3);
+    const y: []f64 = try VecF64.alloc(3);
     inline for (.{ 3.0, 1.0, 5.0 }, y) |v, *p| p.* = v;
 
     defer {
-        MatF32.free(A, 4, 3);
-        allocator.free(x);
-        allocator.free(y);
+        MatF64.free(A, 4, 3);
+        VecF64.free(x);
+        VecF64.free(y);
     }
 
-    const a_list: [4]f32 = .{ 0.0, 1.0, -1.0, 3.0 };
-    const A_list: [4][4][3]f32 = .{
+    const a_list: [4]f64 = .{ 0.0, 1.0, -1.0, 3.0 };
+    const A_list: [4][4][3]f64 = .{
         .{ .{ 7.0, -11.0, 0.0 }, .{ 5.0, -17.0, 3.0 }, .{ 1.0, -13.0, 2.0 }, .{ 2.0, -19.0, 0.0 } },
         .{ .{ 4.0, -12.0, -5.0 }, .{ 14.0, -14.0, 18.0 }, .{ -14.0, -18.0, -23.0 }, .{ 5.0, -18.0, 5.0 } },
         .{ .{ 10.0, -10.0, 5.0 }, .{ -4.0, -20.0, -12.0 }, .{ 16.0, -8.0, 27.0 }, .{ -1.0, -20.0, -5.0 } },
@@ -353,10 +348,10 @@ test "blas.geru.U" {
         inline for (.{ 1.0, -13.0, 2.0 }, A[2]) |v, *p| p.* = v;
         inline for (.{ 2.0, -19.0, 0.0 }, A[3]) |v, *p| p.* = v;
 
-        geru(f32, .U, a, x, y, A);
+        geru(.U, a, x, y, A);
 
         for (A_list[ia], A) |ans, row| {
-            try testing.expect(std.mem.eql(f32, &ans, row));
+            try testing.expect(std.mem.eql(f64, &ans, row));
         }
     }
 }

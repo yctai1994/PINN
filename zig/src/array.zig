@@ -2,6 +2,7 @@ const std = @import("std");
 const Error = error{ ZeroAllocation, OutOfMemory };
 
 fn allocWithAlign(comptime T: type, n: usize, buffer: []u8, end_index_ptr: *usize) Error![]align(@alignOf(T)) T {
+    if (T != f64 and T != []f64) @compileError("allocWithAlign(...) only accepts f64 and []f64.");
     const child_size: comptime_int = comptime @sizeOf(T);
     const align_size: comptime_int = comptime @alignOf(T);
 
@@ -14,9 +15,9 @@ fn allocWithAlign(comptime T: type, n: usize, buffer: []u8, end_index_ptr: *usiz
 
     const shifted_index: usize = blk: {
         const addr: usize = @intFromPtr(buffer.ptr + end_index_ptr.*);
-        var ov = @addWithOverflow(addr, align_size - 1);
+        var ov = @addWithOverflow(addr, comptime align_size - 1);
         if (ov[1] != 0) return Error.OutOfMemory;
-        ov[0] &= ~@as(usize, align_size - 1);
+        ov[0] &= ~@as(usize, comptime align_size - 1);
         break :blk end_index_ptr.* + ov[0] - addr; // padding: usize = ov[0] - addr;
     };
 
@@ -45,7 +46,7 @@ test "allocWithAlign" {
 
     var my_end_index: usize = 0;
 
-    const list = [_]type{ f16, f32, f64, f80, f128 };
+    const list = [_]type{ f64, []f64 };
 
     inline for (list) |T| {
         const fba_ret: []T = try fba_allocator.alloc(T, 5);
@@ -60,74 +61,80 @@ test "allocWithAlign" {
     }
 }
 
-pub fn Matrix(comptime T: type) type {
-    if (@typeInfo(T) != .Float) @compileError("Matrix(...) only accepts float types.");
-    const child_size: comptime_int = comptime @sizeOf(T);
-    const slice_size: comptime_int = comptime @sizeOf(usize) * 2;
+const size_of_f64: comptime_int = @sizeOf(f64); // already comptime scope
+const size_of_slice: comptime_int = @sizeOf(usize) * 2; // already comptime scope
 
-    return struct {
-        allocator: std.mem.Allocator = std.heap.page_allocator,
+pub const Matrix = struct {
+    allocator: std.mem.Allocator = std.heap.page_allocator,
 
-        pub fn alloc(self: @This(), nrow: usize, ncol: usize) Error![][]T {
-            const buffer: []u8 = try self.allocator.alloc(u8, nrow * ncol * child_size + nrow * slice_size);
-            errdefer self.allocator.free(buffer);
-            var end_index: usize = 0;
-            const mat: [][]T = try allocWithAlign([]T, nrow, buffer, &end_index);
-            for (mat) |*row| row.* = try allocWithAlign(T, ncol, buffer, &end_index);
-            return mat;
-        }
+    pub fn alloc(self: Matrix, nrow: usize, ncol: usize) Error![][]f64 {
+        const buffer: []u8 = try self.allocator.alloc(u8, nrow * ncol * size_of_f64 + nrow * size_of_slice);
+        errdefer self.allocator.free(buffer);
+        var end_index: usize = 0;
+        const mat: [][]f64 = try allocWithAlign([]f64, nrow, buffer, &end_index);
+        for (mat) |*row| row.* = try allocWithAlign(f64, ncol, buffer, &end_index);
+        return mat;
+    }
 
-        pub fn free(self: @This(), mat: [][]T, nrow: usize, ncol: usize) void {
-            const ptr: [*]u8 = @ptrCast(@alignCast(mat.ptr));
-            const len: usize = nrow * ncol * child_size + nrow * slice_size;
-            self.allocator.free(ptr[0..len]);
-            return;
-        }
-    };
-}
+    pub fn free(self: Matrix, mat: [][]f64, nrow: usize, ncol: usize) void {
+        const ptr: [*]u8 = @ptrCast(@alignCast(mat.ptr));
+        const len: usize = nrow * ncol * size_of_f64 + nrow * size_of_slice;
+        self.allocator.free(ptr[0..len]);
+        return;
+    }
+};
+
+pub const Vector = struct {
+    allocator: std.mem.Allocator = std.heap.page_allocator,
+
+    pub fn alloc(self: Vector, n: usize) Error![]f64 {
+        return try self.allocator.alloc(f64, n);
+    }
+
+    pub fn free(self: Vector, vec: []f64) void {
+        self.allocator.free(vec);
+        return;
+    }
+};
 
 test "Matrix.allocator" {
-    const MatF32 = Matrix(f32);
     {
-        const Matf32_1 = MatF32{ .allocator = std.testing.allocator };
-        const Matf32_2 = MatF32{ .allocator = std.testing.allocator };
-        try std.testing.expect(&Matf32_1.allocator == &Matf32_2.allocator);
+        const Matf64_1 = Matrix{ .allocator = std.testing.allocator };
+        const Matf64_2 = Matrix{ .allocator = std.testing.allocator };
+        try std.testing.expect(&Matf64_1.allocator == &Matf64_2.allocator);
     }
     {
-        const Matf32_1 = MatF32{ .allocator = std.heap.page_allocator };
-        const Matf32_2 = MatF32{ .allocator = std.heap.page_allocator };
-        try std.testing.expect(&Matf32_1.allocator == &Matf32_2.allocator);
+        const Matf64_1 = Matrix{ .allocator = std.heap.page_allocator };
+        const Matf64_2 = Matrix{ .allocator = std.heap.page_allocator };
+        try std.testing.expect(&Matf64_1.allocator == &Matf64_2.allocator);
     }
 }
 
 test "Matrix.alloc & Matrix.free" {
     const nrow = 35;
     const ncol = 17;
-    const list = [_]type{ f16, f32, f64, f80, f128 };
 
-    inline for (list) |T| {
-        const MatT: Matrix(T) = .{ .allocator = std.testing.allocator };
-        const mat: [][]T = try MatT.alloc(nrow, ncol);
-        defer MatT.free(mat, nrow, ncol); // same as "defer allocator.free(buff);"
+    const MatT: Matrix = .{ .allocator = std.testing.allocator };
+    const mat: [][]f64 = try MatT.alloc(nrow, ncol);
+    defer MatT.free(mat, nrow, ncol); // same as "defer allocator.free(buff);"
 
-        var fba = blk: {
-            const ptr: [*]u8 = @ptrCast(@alignCast(mat.ptr));
-            const len: usize = nrow * ncol * @sizeOf(T) + nrow * @sizeOf(usize) * 2;
-            break :blk std.heap.FixedBufferAllocator.init(ptr[0..len]);
-        };
-        const allocator = fba.allocator();
+    var fba = blk: {
+        const ptr: [*]u8 = @ptrCast(@alignCast(mat.ptr));
+        const len: usize = nrow * ncol * size_of_f64 + nrow * size_of_slice;
+        break :blk std.heap.FixedBufferAllocator.init(ptr[0..len]);
+    };
+    const allocator = fba.allocator();
 
-        const ref: [][]T = blk: {
-            const tmp: [][]T = try allocator.alloc([]T, nrow);
-            for (tmp) |*row| row.* = try allocator.alloc(T, ncol);
-            break :blk tmp;
-        };
+    const ref: [][]f64 = blk: {
+        const tmp: [][]f64 = try allocator.alloc([]f64, nrow);
+        for (tmp) |*row| row.* = try allocator.alloc(f64, ncol);
+        break :blk tmp;
+    };
 
-        for (0..nrow) |i| {
-            try std.testing.expect(&mat[i] == &ref[i]);
-            for (0..ncol) |j| {
-                try std.testing.expect(&mat[i][j] == &ref[i][j]);
-            }
+    for (0..nrow) |i| {
+        try std.testing.expect(&mat[i] == &ref[i]);
+        for (0..ncol) |j| {
+            try std.testing.expect(&mat[i][j] == &ref[i][j]);
         }
     }
 }
