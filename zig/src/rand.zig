@@ -12,12 +12,12 @@ fn splitmix64(smx: *u64) u64 {
     return ret ^ (ret >> 31);
 }
 
-test "SplitMix64" {
+test "splitMix64" {
     var smx: u64 = 1234567;
-    try std.testing.expect(splitmix64(&smx) == 0x599ed017fb08fc85);
-    try std.testing.expect(splitmix64(&smx) == 0x2c73f08458540fa5);
-    try std.testing.expect(splitmix64(&smx) == 0x883ebce5a3f27c77);
-    try std.testing.expect(splitmix64(&smx) == 0x3fbef740e9177b3f);
+    try std.testing.expectEqual(splitmix64(&smx), 0x599ed017fb08fc85);
+    try std.testing.expectEqual(splitmix64(&smx), 0x2c73f08458540fa5);
+    try std.testing.expectEqual(splitmix64(&smx), 0x883ebce5a3f27c77);
+    try std.testing.expectEqual(splitmix64(&smx), 0x3fbef740e9177b3f);
 }
 
 fn rotl(x: u64, r: u6) u64 {
@@ -65,18 +65,18 @@ fn Xoshiro256(comptime T: type) type {
 
 test "Xoshiro256+" {
     var xsr = Xoshiro256(f64).init(1234567);
-    try std.testing.expect(xsr.rand() + 1.0 == 1.5990871994036995); // 0x995dc758e42077c4
-    try std.testing.expect(xsr.rand() + 1.0 == 1.7222763479033036); // 0xb8e71a4ceb441e47
-    try std.testing.expect(xsr.rand() + 1.0 == 1.6103971165192643); // 0x9c42fc4505df856a
-    try std.testing.expect(xsr.rand() + 1.0 == 1.1700814247389983); // 0x2b8a74cce93cc5a2
+    try std.testing.expectEqual(xsr.rand() + 1.0, 1.5990871994036995); // 0x995dc758e42077c4
+    try std.testing.expectEqual(xsr.rand() + 1.0, 1.7222763479033036); // 0xb8e71a4ceb441e47
+    try std.testing.expectEqual(xsr.rand() + 1.0, 1.6103971165192643); // 0x9c42fc4505df856a
+    try std.testing.expectEqual(xsr.rand() + 1.0, 1.1700814247389983); // 0x2b8a74cce93cc5a2
 }
 
 test "Xoshiro256++" {
     var xsr = Xoshiro256(u64).init(1234567);
-    try std.testing.expect(xsr.rand() == 0x0610e053dd55ab68);
-    try std.testing.expect(xsr.rand() == 0x70c979e26e27fbac);
-    try std.testing.expect(xsr.rand() == 0xfb95f99f9f6bb2de);
-    try std.testing.expect(xsr.rand() == 0x03890aaecd9fa80a);
+    try std.testing.expectEqual(xsr.rand(), 0x0610e053dd55ab68);
+    try std.testing.expectEqual(xsr.rand(), 0x70c979e26e27fbac);
+    try std.testing.expectEqual(xsr.rand(), 0xfb95f99f9f6bb2de);
+    try std.testing.expectEqual(xsr.rand(), 0x03890aaecd9fa80a);
 }
 
 fn pdf(x: f64) f64 {
@@ -139,6 +139,27 @@ pub const NormPrng = struct {
         return if (negative) x - norm_xr else norm_xr - x;
     }
 };
+
+test "Check Tables of Ziggurat Method" {
+    const norm_xr_test: comptime_float = 3.654152885361009;
+    const norm_sv_test: comptime_float = 0.004928673233974658;
+    const norm_fr_test: comptime_float = @exp(-0.5 * norm_xr_test * norm_xr_test); // pdf(xr)
+    const norm_cr_test: comptime_float = 1.0 + norm_xr_test * norm_fr_test / norm_sv_test; // comparison reference
+
+    try std.testing.expectEqual(norm_xtab[0], norm_xr_test);
+    try std.testing.expectEqual(norm_ftab[0], norm_fr_test);
+    try std.testing.expectEqual(norm_rtab[0], @as(u64, @bitCast(@as(f64, norm_cr_test))));
+
+    try std.testing.expectEqual(norm_xtab[255], 0.0);
+    try std.testing.expectEqual(norm_ftab[255], 1.0);
+    try std.testing.expectEqual(norm_rtab[255], 0x3ff0000000000000);
+
+    for (1..255) |i| {
+        try std.testing.expectEqual(norm_xtab[i], @sqrt(-2.0 * @log(norm_ftab[i - 1] + norm_sv_test / norm_xtab[i - 1])));
+        try std.testing.expectEqual(norm_ftab[i], pdf(norm_xtab[i]));
+        try std.testing.expectEqual(norm_rtab[i], @as(u64, @bitCast(1.0 + norm_xtab[i] / norm_xtab[i - 1])));
+    }
+}
 
 const norm_xtab: [256]f64 = .{
     0x1.d3bb48209ad33p1,
