@@ -1,8 +1,7 @@
 const std = @import("std");
 const testing = std.testing;
 
-const Matrix = @import("./array.zig").Matrix;
-const Vector = @import("./array.zig").Vector;
+const Array = @import("./array.zig").Array;
 
 const Transpose = enum(u1) { N, T }; // (N, T): (Normal, Transpose)
 const WriteMode = enum(u1) { W, U }; // (W, U): (Overwrite, Update)
@@ -13,13 +12,13 @@ pub fn copy(des: []f64, src: []f64) void {
 }
 
 test "blas.copy" {
-    const VecF64: Vector = .{ .allocator = testing.allocator };
-    const src: []f64 = try VecF64.alloc(10);
-    const des: []f64 = try VecF64.alloc(10);
+    const ArrF64: Array = .{ .allocator = testing.allocator };
+    const src: []f64 = try ArrF64.vector(10);
+    const des: []f64 = try ArrF64.vector(10);
 
     defer {
-        VecF64.free(src);
-        VecF64.free(des);
+        ArrF64.free(src);
+        ArrF64.free(des);
     }
 
     for (src, 0..) |*p, i| p.* = @floatFromInt(i);
@@ -35,15 +34,15 @@ pub fn xoty(x: []f64, y: []f64, z: []f64) void {
 }
 
 test "blas.xoty" {
-    const VecF64: Vector = .{ .allocator = testing.allocator };
-    const x: []f64 = try VecF64.alloc(10);
-    const y: []f64 = try VecF64.alloc(10);
-    const z: []f64 = try VecF64.alloc(10);
+    const ArrF64: Array = .{ .allocator = testing.allocator };
+    const x: []f64 = try ArrF64.vector(10);
+    const y: []f64 = try ArrF64.vector(10);
+    const z: []f64 = try ArrF64.vector(10);
 
     defer {
-        VecF64.free(x);
-        VecF64.free(y);
-        VecF64.free(z);
+        ArrF64.free(x);
+        ArrF64.free(y);
+        ArrF64.free(z);
     }
 
     for (x, y, 0..) |*px, *py, i| {
@@ -115,27 +114,27 @@ pub fn gemv(comptime tA: Transpose, a: f64, A: [][]f64, x: []f64, b: f64, y: []f
 }
 
 test "blas.gemv.N" {
-    const MatF64: Matrix = .{ .allocator = testing.allocator };
-    const A: [][]f64 = try MatF64.alloc(4, 3);
+    const ArrF64: Array = .{ .allocator = testing.allocator };
+
+    const A: [][]f64 = try ArrF64.matrix(4, 3);
     inline for (.{ 4.0, 3.0, 1.0 }, A[0]) |v, *p| p.* = v;
     inline for (.{ 3.0, 7.0, 0.0 }, A[1]) |v, *p| p.* = v;
     inline for (.{ 2.0, 5.0, 3.0 }, A[2]) |v, *p| p.* = v;
     inline for (.{ 1.0, 1.0, 2.0 }, A[3]) |v, *p| p.* = v;
 
-    const VecF64: Vector = .{ .allocator = testing.allocator };
-    const x: []f64 = try VecF64.alloc(3);
+    const x: []f64 = try ArrF64.vector(3);
     inline for (.{ 3.0, 1.0, 5.0 }, x) |v, *p| p.* = v;
 
-    const y: []f64 = try VecF64.alloc(4);
+    const y: []f64 = try ArrF64.vector(4);
     inline for (.{ -1.0, 3.0, -5.0, 1.0 }, y) |v, *p| p.* = v;
 
-    const z: []f64 = try VecF64.alloc(4);
+    const z: []f64 = try ArrF64.vector(4);
 
     defer {
-        MatF64.free(A, 4, 3);
-        VecF64.free(x);
-        VecF64.free(y);
-        VecF64.free(z);
+        ArrF64.free(A);
+        ArrF64.free(x);
+        ArrF64.free(y);
+        ArrF64.free(z);
     }
 
     const a_list: [4]f64 = .{ 0.0, 1.0, -1.0, 3.0 };
@@ -169,27 +168,27 @@ test "blas.gemv.N" {
 }
 
 test "blas.gemv.T" {
-    const MatF64: Matrix = .{ .allocator = testing.allocator };
-    const A: [][]f64 = try MatF64.alloc(4, 3);
+    const ArrF64: Array = .{ .allocator = testing.allocator };
+
+    const A: [][]f64 = try ArrF64.matrix(4, 3);
     inline for (.{ 7.0, -11.0, 0.0 }, A[0]) |v, *p| p.* = v;
     inline for (.{ 5.0, -17.0, 3.0 }, A[1]) |v, *p| p.* = v;
     inline for (.{ 1.0, -13.0, 2.0 }, A[2]) |v, *p| p.* = v;
     inline for (.{ 2.0, -19.0, 0.0 }, A[3]) |v, *p| p.* = v;
 
-    const VecF64: Vector = .{ .allocator = testing.allocator };
-    const x: []f64 = try VecF64.alloc(4);
+    const x: []f64 = try ArrF64.vector(4);
     inline for (.{ 3.0, 1.0, 0.0, 5.0 }, x) |v, *p| p.* = v;
 
-    const y: []f64 = try VecF64.alloc(3);
+    const y: []f64 = try ArrF64.vector(3);
     inline for (.{ -1.0, 2.0, 1.0 }, y) |v, *p| p.* = v;
 
-    const z: []f64 = try VecF64.alloc(3);
+    const z: []f64 = try ArrF64.vector(3);
 
     defer {
-        MatF64.free(A, 4, 3);
-        VecF64.free(x);
-        VecF64.free(y);
-        VecF64.free(z);
+        ArrF64.free(A);
+        ArrF64.free(x);
+        ArrF64.free(y);
+        ArrF64.free(z);
     }
 
     const a_list: [4]f64 = .{ 0.0, 1.0, -1.0, 3.0 };
@@ -284,20 +283,19 @@ pub fn geru(comptime mode: WriteMode, a: f64, x: []f64, y: []f64, A: [][]f64) vo
 }
 
 test "blas.geru.W" {
-    const MatF64: Matrix = .{ .allocator = testing.allocator };
-    const A: [][]f64 = try MatF64.alloc(4, 3);
+    const ArrF64: Array = .{ .allocator = testing.allocator };
+    const A: [][]f64 = try ArrF64.matrix(4, 3);
 
-    const VecF64: Vector = .{ .allocator = testing.allocator };
-    const x: []f64 = try VecF64.alloc(4);
+    const x: []f64 = try ArrF64.vector(4);
     inline for (.{ -1.0, 3.0, -5.0, 1.0 }, x) |v, *p| p.* = v;
 
-    const y: []f64 = try VecF64.alloc(3);
+    const y: []f64 = try ArrF64.vector(3);
     inline for (.{ 3.0, 1.0, 5.0 }, y) |v, *p| p.* = v;
 
     defer {
-        MatF64.free(A, 4, 3);
-        VecF64.free(x);
-        VecF64.free(y);
+        ArrF64.free(A);
+        ArrF64.free(x);
+        ArrF64.free(y);
     }
 
     const a_list: [4]f64 = .{ 0.0, 1.0, -1.0, 3.0 };
@@ -318,20 +316,20 @@ test "blas.geru.W" {
 }
 
 test "blas.geru.U" {
-    const MatF64: Matrix = .{ .allocator = testing.allocator };
-    const A: [][]f64 = try MatF64.alloc(4, 3);
+    const ArrF64: Array = .{ .allocator = testing.allocator };
 
-    const VecF64: Vector = .{ .allocator = testing.allocator };
-    const x: []f64 = try VecF64.alloc(4);
+    const A: [][]f64 = try ArrF64.matrix(4, 3);
+
+    const x: []f64 = try ArrF64.vector(4);
     inline for (.{ -1.0, 3.0, -5.0, 1.0 }, x) |v, *p| p.* = v;
 
-    const y: []f64 = try VecF64.alloc(3);
+    const y: []f64 = try ArrF64.vector(3);
     inline for (.{ 3.0, 1.0, 5.0 }, y) |v, *p| p.* = v;
 
     defer {
-        MatF64.free(A, 4, 3);
-        VecF64.free(x);
-        VecF64.free(y);
+        ArrF64.free(A);
+        ArrF64.free(x);
+        ArrF64.free(y);
     }
 
     const a_list: [4]f64 = .{ 0.0, 1.0, -1.0, 3.0 };
