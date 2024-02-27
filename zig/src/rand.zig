@@ -105,13 +105,13 @@ pub const NormPrng = struct {
         return .{ .xu64 = xu64, .xf64 = xf64 };
     }
 
-    pub fn free(self: NormPrng, allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const NormPrng, allocator: std.mem.Allocator) void {
         allocator.destroy(self.xu64);
         allocator.destroy(self.xf64);
         return;
     }
 
-    pub fn rand(self: NormPrng) f64 {
+    pub fn rand(self: *const NormPrng) f64 {
         var ub: u64 = self.xu64.rand(); // uniform random as bit
         var bi: u64 = undefined;
         var ui: u64 = undefined;
@@ -129,7 +129,7 @@ pub const NormPrng = struct {
         }
     }
 
-    fn tail(self: NormPrng, negative: bool) f64 {
+    fn tail(self: *const NormPrng, negative: bool) f64 {
         var x: f64 = 1.0;
         var y: f64 = 0.0;
         while (-2.0 * y < x * x) {
