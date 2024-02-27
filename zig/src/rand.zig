@@ -98,7 +98,11 @@ pub const NormPrng = struct {
         };
 
         const xu64: *Xoshiro256(u64) = try allocator.create(Xoshiro256(u64));
+        errdefer allocator.destroy(xu64);
+
         const xf64: *Xoshiro256(f64) = try allocator.create(Xoshiro256(f64));
+        errdefer allocator.destroy(xf64);
+
         xu64.* = Xoshiro256(u64).init(seed);
         xf64.* = Xoshiro256(f64).init(seed);
 

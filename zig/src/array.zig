@@ -12,7 +12,6 @@ pub const Array = struct {
 
     pub fn matrix(self: Array, nrow: usize, ncol: usize) Error![][]f64 {
         const buff: []u8 = try self.allocator.alloc(u8, nrow * ncol * child_sz + nrow * slice_sz);
-        errdefer self.allocator.free(buff);
 
         const mat: [][]f64 = blk: {
             const ptr: [*]align(slice_al) []f64 = @ptrCast(@alignCast(buff.ptr));
@@ -29,6 +28,7 @@ pub const Array = struct {
             };
             padding += chunk_sz;
         }
+
         return mat;
     }
 
@@ -38,6 +38,7 @@ pub const Array = struct {
 
     pub fn free(self: Array, slice: anytype) void {
         const T: type = comptime @TypeOf(slice);
+
         switch (T) {
             [][]f64 => {
                 const ptr: [*]u8 = @ptrCast(@alignCast(slice.ptr));
@@ -54,6 +55,7 @@ pub const Array = struct {
             },
             else => @compileError("Invalid type: " ++ @typeName(T)),
         }
+
         return;
     }
 };
